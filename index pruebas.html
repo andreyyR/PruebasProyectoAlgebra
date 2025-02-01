@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema de ecuaciones (reducción gausiana simbólica)</title>
+  <!-- Se incluye la librería Algebrite (versión 1.4.0) para manejo simbólico -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/algebrite/1.4.0/algebrite.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #2b2b2b;
+      color: #ccc;
+      font-family: Arial, sans-serif;
+    }
+    header {
+      padding: 10px 20px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+    .container {
+      margin: 20px;
+    }
+    .instrucciones {
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .contenedor-sistema {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .contenedor-tabla {
+      display: flex;
+      align-items: center;
+    }
+    .llave-izquierda {
+      font-size: 2rem;
+      margin-right: 5px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-right: 15px;
+    }
+    table tr {
+      height: 32px;
+    }
+    table td {
+      border: 1px solid #555;
+      padding: 2px 5px;
+    }
+    input[type='text'] {
+      width: 80px;
+      font-size: 1rem;
+      text-align: center;
+      background-color: #444;
+      color: #fff;
+      border: 1px solid #666;
+      border-radius: 3px;
+    }
+    .panel-celdas {
+      margin-left: 10px;
+    }
+    .panel-celdas button {
+      background-color: #444;
+      color: #eee;
+      border: 1px solid #666;
+      margin: 0 2px;
+      border-radius: 3px;
+      cursor: pointer;
+      width: 25px;
+      height: 25px;
+    }
+    .contenedor-metodo {
+      margin: 10px 0;
+    }
+    button,
+    select {
+      background-color: #444;
+      color: #eee;
+      border: 1px solid #666;
+      margin: 0 2px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 3px 5px;
+    }
+    .contenedor-resultado {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #333;
+      border: 1px solid #444;
+      border-radius: 5px;
+    }
+    .pasos {
+      line-height: 1.4;
+      font-size: 0.9rem;
+    }
+    .pasos pre {
+      background-color: #2b2b2b;
+      border: 1px solid #444;
+      padding: 5px;
+      margin: 5px 0;
+      overflow-x: auto;
+      font-family: Consolas, monospace;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sistema de ecuaciones (reducción gausiana simbólica)</h1>
+  </header>
+
+  <div class="container">
+    <p class="instrucciones">
+      Ingrese las expresiones algebraicas para los coeficientes y términos independientes.<br>
+      Ejemplos de entrada: <strong>a</strong>, <strong>a -2</strong>, <strong>a elevado a la 2</strong>, <strong>2 * a</strong>, etc.<br>
+      La página preprocesa las expresiones (por ejemplo, convierte "elevado a la" en "^") y realiza la reducción gausiana mostrando el proceso paso a paso.<br>
+      <br>
+      <em>Ejemplo de sistema:</em><br>
+      <strong>a  1  1  = 1</strong><br>
+      <strong>1  a  1  = 1</strong><br>
+      <strong>1  1  a  = 1</strong>
+    </p>
+
+    <div class="contenedor-sistema">
+      <div class="contenedor-tabla">
+        <div class="llave-izquierda">&#123;</div>
+        <table id="matriz"></table>
+      </div>
+      <div class="panel-celdas">
+        Filas:
+        <button onclick="agregarFila()">+</button>
+        <button onclick="eliminarFila()">-</button>
+      </div>
+    </div>
+
+    <div class="contenedor-metodo">
+      <select id="metodoSelect">
+        <option value="gaussian">Resolver por eliminación gausiana simbólica</option>
+      </select>
+      <button onclick="resolverSistema()">Resolver</button>
+    </div>
+
+    <div class="contenedor-resultado">
+      <div class="pasos" id="salidaPasos"></div>
+    </div>
+  </div>
+
+  <script>
+    // --------------------------
+    // Variables globales
+    // --------------------------
+    let filasActuales = 3;
+    let colsActuales = 3;
+    // Nombres de variables para la solución (por ejemplo: x, y, z, …)
+    const variables = ['x', 'y', 'z', 'w', 'v', 'u', 'p', 'q'];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      crearTabla(filasActuales, colsActuales);
+    });
+
+    // --------------------------
+    // Función para crear la tabla de entrada
+    // --------------------------
+    function crearTabla(filas, cols) {
+      const tabla = document.getElementById('matriz');
+      tabla.innerHTML = '';
+      for (let i = 0; i < filas; i++) {
+        const tr = document.createElement('tr');
+        for (let j = 0; j < cols; j++) {
+          const td = document.createElement('td');
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.placeholder = variables[j] || `v${j + 1}`;
+          td.appendChild(inp);
+          tr.appendChild(td);
+        }
+        // Última columna: término independiente (lado derecho)
+        const tdRHS = document.createElement('td');
+        const inpRHS = document.createElement('input');
+        inpRHS.type = 'text';
+        inpRHS.placeholder = 'Resultado';
+        tdRHS.appendChild(inpRHS);
+        tr.appendChild(tdRHS);
+        tabla.appendChild(tr);
+      }
+    }
+
+    function agregarFila() {
+      filasActuales++;
+      crearTabla(filasActuales, colsActuales);
+    }
+
+    function eliminarFila() {
+      if (filasActuales > 1) {
+        filasActuales--;
+        crearTabla(filasActuales, colsActuales);
+      }
+    }
+
+    // --------------------------
+    // Preprocesa la expresión ingresada para convertir,
+    // por ejemplo, "elevado a la" en "^"
+    // --------------------------
+    function preprocessExpression(str) {
+      // Reemplaza "elevado a la" (ignorando mayúsculas/minúsculas y espacios múltiples) por "^"
+      return str.replace(/elevado\s+a\s+la\s+/gi, "^").trim();
+    }
+
+    // --------------------------
+    // Función para "parsear" la expresión ingresada.
+    // Si el usuario no ingresa nada se toma como "0".
+    // --------------------------
+    function parseExpression(str) {
+      str = str.trim();
+      if (str === "") return "0";
+      return preprocessExpression(str);
+    }
+
+    // --------------------------
+    // Funciones para operaciones simbólicas utilizando Algebrite.
+    // Cada función envuelve la operación y retorna el resultado simplificado.
+    // --------------------------
+    function symAdd(expr1, expr2) {
+      return Algebrite.run("simplify((" + expr1 + ")+(" + expr2 + "))");
+    }
+
+    function symSub(expr1, expr2) {
+      return Algebrite.run("simplify((" + expr1 + ")-(" + expr2 + "))");
+    }
+
+    function symMul(expr1, expr2) {
+      return Algebrite.run("simplify((" + expr1 + ")*(" + expr2 + "))");
+    }
+
+    function symDiv(expr1, expr2) {
+      return Algebrite.run("simplify((" + expr1 + ")/(" + expr2 + "))");
+    }
+
+    function symIsZero(expr) {
+      let simplified = Algebrite.run("simplify(" + expr + ")");
+      return simplified.trim() === "0";
+    }
+
+    // --------------------------
+    // Función que formatea la matriz (arreglo de arreglos de cadenas) para mostrarla
+    // --------------------------
+    function formatearMatrizSimbolica(mat) {
+      let salida = "";
+      for (let i = 0; i < mat.length; i++) {
+        let row = mat[i];
+        let left = row.slice(0, row.length - 1).join("   ");
+        let right = row[row.length - 1];
+        salida += "[ " + left + " | " + right + " ]\n";
+      }
+      return salida;
+    }
+
+    // --------------------------
+    // Funciones para construir mensajes que se muestran en pantalla
+    // --------------------------
+    function msg(text) {
+      return { type: "msg", text: text };
+    }
+    function mat(text) {
+      return { type: "matrix", text: text };
+    }
+
+    // --------------------------
+    // Función que realiza la reducción gausiana simbólica (con intercambio simple si es necesario)
+    // --------------------------
+    function eliminacionSimbolica(matriz) {
+      const pasos = [];
+      pasos.push(msg("Solución por reducción gausiana simbólica"));
+      pasos.push(msg("--------------------------------------------------------------------------"));
+      pasos.push(msg("Matriz aumentada inicial:"));
+      pasos.push(mat(formatearMatrizSimbolica(matriz)));
+
+      const n = matriz.length;      // número de ecuaciones
+      const m = matriz[0].length;     // número de columnas (coeficientes + RHS)
+
+      // Verificar e intentar intercambiar filas para que el primer pivote no sea 0
+      if (symIsZero(matriz[0][0])) {
+        let filaEncontrada = -1;
+        for (let k = 1; k < n; k++) {
+          if (!symIsZero(matriz[k][0])) {
+            filaEncontrada = k;
+            break;
+          }
+        }
+        if (filaEncontrada === -1) {
+          pasos.push(msg("Advertencia: Pivote cero en la primera columna. No se encontró fila para intercambiar."));
+        } else {
+          [matriz[0], matriz[filaEncontrada]] = [matriz[filaEncontrada], matriz[0]];
+          pasos.push(msg(`Intercambiando filas: R1 <-> R${filaEncontrada + 1}`));
+          pasos.push(mat(formatearMatrizSimbolica(matriz)));
+        }
+      }
+
+      // Fase de eliminación hacia adelante
+      for (let i = 0; i < n; i++) {
+        let pivot = matriz[i][i];
+        if (symIsZero(pivot)) {
+          pasos.push(msg(`Advertencia: Pivote cero en la fila ${i + 1}, columna ${i + 1}. Se omite eliminación para esta fila.`));
+          continue;
+        }
+        for (let k = i + 1; k < n; k++) {
+          let factor = symDiv(matriz[k][i], pivot);
+          pasos.push(msg(`R${k + 1} -> R${k + 1} - (${factor}) * R${i + 1}`));
+          for (let c = i; c < m; c++) {
+            matriz[k][c] = symSub(matriz[k][c], symMul(factor, matriz[i][c]));
+          }
+          pasos.push(mat(formatearMatrizSimbolica(matriz)));
+        }
+      }
+
+      // Fase de sustitución hacia atrás
+      let solucion = new Array(n).fill("");
+      pasos.push(msg("Proceso de sustitución hacia atrás:"));
+      for (let i = n - 1; i >= 0; i--) {
+        let sum = matriz[i][m - 1];  // término independiente
+        for (let j = i + 1; j < n; j++) {
+          sum = symSub(sum, symMul(matriz[i][j], solucion[j]));
+        }
+        let pivot = matriz[i][i];
+        let varName = variables[i] || ("v" + (i + 1));
+        pasos.push(msg(`Encontrar ${varName} en la ecuación ${i + 1}:`));
+        pasos.push(msg(`${pivot} * ${varName} = ${sum}`));
+        let sol = symDiv(sum, pivot);
+        solucion[i] = sol;
+        pasos.push(msg(`${varName} = ${sol}`));
+      }
+
+      pasos.push(msg("Respuesta final:"));
+      for (let i = 0; i < n; i++) {
+        let varName = variables[i] || ("v" + (i + 1));
+        pasos.push(msg(`${varName} = ${solucion[i]}`));
+      }
+      pasos.push(msg("Solución general: X = (" + solucion.join(", ") + ")"));
+
+      return pasos;
+    }
+
+    // --------------------------
+    // Función que lee la matriz ingresada y llama a la eliminación simbólica
+    // --------------------------
+    function resolverSistema() {
+      try {
+        const contPasos = document.getElementById("salidaPasos");
+        contPasos.innerHTML = "";
+        const tabla = document.getElementById("matriz");
+        const filas = tabla.rows.length;
+        if (filas < 1) return;
+        const cols = tabla.rows[0].cells.length - 1; // la última columna es el RHS
+
+        // Construir la matriz aumentada (cada elemento es una cadena que representa una expresión algebraica)
+        const matriz = [];
+        for (let i = 0; i < filas; i++) {
+          const filaDatos = [];
+          for (let j = 0; j < cols; j++) {
+            const valStr = tabla.rows[i].cells[j].children[0].value;
+            const expr = parseExpression(valStr);
+            filaDatos.push(expr);
+          }
+          const rhsStr = tabla.rows[i].cells[cols].children[0].value;
+          filaDatos.push(parseExpression(rhsStr));
+          matriz.push(filaDatos);
+        }
+
+        // Ejecutar la reducción gausiana simbólica
+        const pasos = eliminacionSimbolica(matriz);
+        mostrarPasos(pasos);
+      } catch (e) {
+        console.error(e);
+        alert("Error: " + e.message);
+      }
+    }
+
+    // --------------------------
+    // Función para mostrar los pasos en pantalla
+    // --------------------------
+    function mostrarPasos(pasos) {
+      const cont = document.getElementById("salidaPasos");
+      cont.innerHTML = "";
+      pasos.forEach(p => {
+        if (p.type === "msg") {
+          const parrafo = document.createElement("p");
+          parrafo.textContent = p.text;
+          cont.appendChild(parrafo);
+        } else if (p.type === "matrix") {
+          const pre = document.createElement("pre");
+          pre.textContent = p.text;
+          cont.appendChild(pre);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
